@@ -1,0 +1,81 @@
+name: dbt CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dbt-ci:
+    name: dbt run + test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-dbt-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dbt
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Write dbt profiles
+        # Writes profiles.yml from GitHub Secrets — never store credentials in code
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << EOF
+          ecommerce_analytics:
+            target: ci
+            outputs:
+              ci:
+                type: snowflake
+                account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+                user: ${{ secrets.SNOWFLAKE_USER }}
+                password: ${{ secrets.SNOWFLAKE_PASSWORD }}
+                role: ${{ secrets.SNOWFLAKE_ROLE }}
+                database: ECOMMERCE_DEV
+                warehouse: COMPUTE_WH
+                schema: dbt_ci_${{ github.run_id }}
+                threads: 4
+          EOF
+
+      - name: Install dbt packages
+        run: dbt deps
+
+      - name: dbt compile (syntax check — no Snowflake needed)
+        run: dbt compile --target ci
+        # Note: compile checks all SQL syntax and ref() resolution
+        # without running anything against Snowflake.
+        # Remove this and use 'dbt run' once you have Snowflake secrets set up.
+
+      # Uncomment these steps once Snowflake secrets are configured in GitHub:
+      #
+      # - name: dbt seed (load CSV test data)
+      #   run: dbt seed --target ci
+      #
+      # - name: dbt run (build all models)
+      #   run: dbt run --target ci
+      #
+      # - name: dbt test (run all tests)
+      #   run: dbt test --target ci
+      #
+      # - name: dbt snapshot
+      #   run: dbt snapshot --target ci
+      #
+      # - name: Cleanup CI schema
+      #   if: always()
+      #   run: |
+      #     dbt run-operation drop_schema --args \
+      #       "{schema: dbt_ci_${{ github.run_id }}, database: ECOMMERCE_DEV}"

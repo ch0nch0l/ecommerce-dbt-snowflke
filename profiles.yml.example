@@ -1,0 +1,53 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# dbt profiles.yml — Snowflake connection config
+#
+# IMPORTANT: This is an EXAMPLE file.
+# Copy it to ~/.dbt/profiles.yml and fill in your real values.
+# NEVER commit the real profiles.yml — it contains credentials.
+#
+# How to find your Snowflake account identifier:
+#   Log in to Snowflake → bottom-left corner shows your account
+#   Format: <orgname>-<accountname>  e.g. myorg-abc12345
+#   Or from the URL: https://app.snowflake.com/<orgname>/<accountname>
+# ──────────────────────────────────────────────────────────────────────────────
+
+ecommerce_analytics:
+  target: dev
+  outputs:
+
+    # ── Development environment ───────────────────────────────────────────────
+    dev:
+      type: snowflake
+      account: "<your_snowflake_account>"        # e.g. myorg-abc12345
+      user: "<your_username>"
+      password: "<your_password>"
+      role: SYSADMIN                              # or your custom dbt role
+      database: ECOMMERCE_DEV
+      warehouse: COMPUTE_WH                       # XS warehouse is fine for dev
+      schema: dbt_dev                             # personal dev schema
+      threads: 4
+      client_session_keep_alive: false
+
+    # ── CI environment (used in GitHub Actions) ───────────────────────────────
+    ci:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'SYSADMIN') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'ECOMMERCE_DEV') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH') }}"
+      schema: dbt_ci
+      threads: 4
+
+    # ── Production environment ────────────────────────────────────────────────
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'SYSADMIN') }}"
+      database: ECOMMERCE_PROD
+      warehouse: COMPUTE_WH
+      schema: analytics
+      threads: 8
